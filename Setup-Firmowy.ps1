@@ -1,273 +1,221 @@
 # ============================================================
-#  SKRYPT PRZYGOTOWANIA KOMPUTERA FIRMOWEGO
-#  Uruchom jako Administrator: klik PPM -> "Uruchom jako administrator"
+#  CORPORATE PC PREPARATION SCRIPT / SKRYPT PRZYGOTOWANIA PC
 # ============================================================
 
-#region --- KONFIGURACJA ---
-$InstallerPath = "C:\instalki"   # <-- folder z instalatorami
+#region --- JĘZYK / LANGUAGE ---
+Clear-Host
+Write-Host "Select language / Wybierz język:" -ForegroundColor White
+Write-Host "1. English"
+Write-Host "2. Polski"
+$choice = Read-Host "Choice / Wybór (1/2)"
+
+$T = @{} # Obiekt tłumaczeń
+
+if ($choice -eq "1") {
+    $T.Step0 = "Step 0: Setting computer name"
+    $T.Step1 = "Step 1: Power settings - Never sleep"
+    $T.Step2 = "Step 2: Removing old Office versions"
+    $T.Step3 = "Step 3: Application installation"
+    $T.Step4 = "Step 4: Restoring ExecutionPolicy"
+    $T.AdminReq = "Please run this script as Administrator!"
+    $T.FolderErr = "Installer folder not found at: "
+    $T.CompNamePrompt = "Current name: {0}`n`nEnter new computer name (max 15 chars, alphanumeric/hyphens):"
+    $T.CompNameTitle = "Computer Name"
+    $T.CompNameChanged = "Computer name changed to: {0} (takes effect after reboot)"
+    $T.CompNameInvalid = "Invalid name! Skipping name change."
+    $T.CompNameSkip = "Computer name unchanged: {0}"
+    $T.PowerSS = "Screen saver: disabled"
+    $T.PowerPlan = "Power plan: High Performance activated"
+    $T.PowerPlanErr = "High Performance plan not found, editing active plan"
+    $T.PowerMonitor = "Monitor timeout: never"
+    $T.PowerStandby = "Standby: never"
+    $T.PowerHib = "Hibernation: disabled"
+    $T.OfficeSearch = "Searching for old Office installations..."
+    $T.OfficeFound = "Found Office installations to remove:"
+    $T.OfficeUninstalling = "Uninstalling: {0}"
+    $T.OfficeDone = "Uninstalled: {0} (Code: {1})"
+    $T.OfficeC2R = "Removing Office Click-to-Run..."
+    $T.OfficeFolder = "Removed folder: {0}"
+    $T.OfficeSkip = "No old Office found - skipping"
+    $T.AppInstall = "Installing: {0}"
+    $T.AppNotFound = "{0} - file not found: {1}"
+    $T.AppManual = "-> Opening {0} installer (manual setup)..."
+    $T.AppDone = "{0} installed (Code: {1})"
+    $T.AppClosed = "{0} - installer closed"
+    $T.ExecRestored = "ExecutionPolicy restored to: Restricted"
+    $T.Summary = "DONE! Computer preparation finished."
+    $T.RebootReq = "WARNING: Reboot required for computer name '{0}' to take effect!"
+} else {
+    $T.Step0 = "Krok 0: Ustawianie nazwy komputera"
+    $T.Step1 = "Krok 1: Wygaszacz ekranu i hibernacja - nigdy"
+    $T.Step2 = "Krok 2: Usuniecie starego Office"
+    $T.Step3 = "Krok 3: Instalacja aplikacji"
+    $T.Step4 = "Krok 4: Przywrocenie Execution Policy"
+    $T.AdminReq = "Uruchom skrypt jako Administrator!"
+    $T.FolderErr = "Folder z instalatorami nie istnieje: "
+    $T.CompNamePrompt = "Aktualna nazwa: {0}`n`nWpisz nowa nazwe (max 15 znakow, litery/cyfry/myslniki):"
+    $T.CompNameTitle = "Nazwa komputera"
+    $T.CompNameChanged = "Nazwa komputera zmieniona na: {0} (wejdzie w zycie po restarcie)"
+    $T.CompNameInvalid = "Nieprawidlowa nazwa! Pomijam zmiane."
+    $T.CompNameSkip = "Nazwa komputera bez zmian: {0}"
+    $T.PowerSS = "Wygaszacz ekranu: wylaczony"
+    $T.PowerPlan = "Plan zasilania: Wysoka wydajnosc aktywny"
+    $T.PowerPlanErr = "Nie znaleziono planu Wysoka wydajnosc, edytuje aktywny plan"
+    $T.PowerMonitor = "Wygaszenie ekranu: nigdy"
+    $T.PowerStandby = "Usypianie: nigdy"
+    $T.PowerHib = "Hibernacja: wylaczona"
+    $T.OfficeSearch = "Szukanie starych instalacji Microsoft Office..."
+    $T.OfficeFound = "Znaleziono instalacje Office do usuniecia:"
+    $T.OfficeUninstalling = "Odinstalowuje: {0}"
+    $T.OfficeDone = "Odinstalowano: {0} (Kod: {1})"
+    $T.OfficeC2R = "Usuwanie Office Click-to-Run..."
+    $T.OfficeFolder = "Usunieto folder: {0}"
+    $T.OfficeSkip = "Nie znaleziono starych instalacji Office - pomijam"
+    $T.AppInstall = "Instalacja: {0}"
+    $T.AppNotFound = "{0} - plik nie znaleziony: {1}"
+    $T.AppManual = "-> Otwieranie instalatora {0} (instalacja reczna)..."
+    $T.AppDone = "{0} zainstalowany (Kod: {1})"
+    $T.AppClosed = "{0} - instalator zamkniety"
+    $T.ExecRestored = "ExecutionPolicy przywrocona do: Restricted"
+    $T.Summary = "GOTOWE! Przygotowanie komputera ukonczone."
+    $T.RebootReq = "UWAGA: Wymagany restart aby nazwa '{0}' weszla w zycie!"
+}
 #endregion
 
-# Kolory w konsoli
+#region --- KONFIGURACJA ---
+$InstallerPath = "C:\instalki"
+#endregion
+
 function Write-Step { param($msg) Write-Host "`n>>> $msg" -ForegroundColor Cyan }
 function Write-OK   { param($msg) Write-Host "    [OK] $msg" -ForegroundColor Green }
 function Write-Skip { param($msg) Write-Host "    [--] $msg" -ForegroundColor Yellow }
 function Write-Err  { param($msg) Write-Host "    [!!] $msg" -ForegroundColor Red }
 
-# Sprawdz uprawnienia administratora
+# Sprawdz uprawnienia
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Err "Uruchom skrypt jako Administrator!"
+    Write-Err $T.AdminReq
     pause; exit 1
 }
 
-# Sprawdz czy folder z instalatorami istnieje
+# Sprawdz folder
 if (-not (Test-Path $InstallerPath)) {
-    Write-Err "Folder $InstallerPath nie istnieje! Utworz go i wgraj instalatory."
+    Write-Err ($T.FolderErr + $InstallerPath)
     pause; exit 1
 }
 
-# ============================================================
-#  KROK 0: NAZWA KOMPUTERA
-# ============================================================
-Write-Step "Ustawianie nazwy komputera"
+# --- KROK 0: NAZWA KOMPUTERA ---
+Write-Step $T.Step0
 Add-Type -AssemblyName Microsoft.VisualBasic
 $currentName = $env:COMPUTERNAME
-$newName = [Microsoft.VisualBasic.Interaction]::InputBox(
-    "Aktualna nazwa komputera: $currentName`n`nWpisz nowa nazwe komputera (tylko litery, cyfry, myslniki; max 15 znakow):",
-    "Nazwa komputera",
-    $currentName
-)
+$newName = [Microsoft.VisualBasic.Interaction]::InputBox(($T.CompNamePrompt -f $currentName), $T.CompNameTitle, $currentName)
 
 if ($newName -ne "" -and $newName -ne $currentName) {
     if ($newName -match "^[a-zA-Z0-9\-]{1,15}$") {
         Rename-Computer -NewName $newName -Force
-        Write-OK "Nazwa komputera zmieniona na: $newName (wejdzie w zycie po restarcie)"
+        Write-OK ($T.CompNameChanged -f $newName)
     } else {
-        Write-Err "Nieprawidlowa nazwa! Pomijam zmiane nazwy."
+        Write-Err $T.CompNameInvalid
     }
 } else {
-    Write-Skip "Nazwa komputera bez zmian: $currentName"
+    Write-Skip ($T.CompNameSkip -f $currentName)
 }
 
-# ============================================================
-#  KROK 1: WYGASZACZ EKRANU I HIBERNACJA - NIGDY
-# ============================================================
-Write-Step "Ustawianie zasilania: wygaszacz i hibernacja = nigdy"
-
+# --- KROK 1: ZASILANIE ---
+Write-Step $T.Step1
 Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "ScreenSaveActive" -Value "0" -Force
-Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "ScreenSaveTimeOut" -Value "0" -Force
-Write-OK "Wygaszacz ekranu: wylaczony"
+Write-OK $T.PowerSS
 
-$highPerfGUID = (powercfg /list | Select-String "Wysoka" | ForEach-Object { ($_ -split "\s+")[3] })
-if (-not $highPerfGUID) {
-    $highPerfGUID = (powercfg /list | Select-String "High performance" | ForEach-Object { ($_ -split "\s+")[3] })
-}
+$highPerfGUID = (powercfg /list | Select-String "Wysoka|High" | ForEach-Object { ($_ -split "\s+")[3] })
 if ($highPerfGUID) {
     powercfg /setactive $highPerfGUID
-    Write-OK "Plan zasilania: Wysoka wydajnosc aktywny"
+    Write-OK $T.PowerPlan
 } else {
-    Write-Skip "Nie znaleziono planu Wysoka wydajnosc, edytuje aktywny plan"
+    Write-Skip $T.PowerPlanErr
 }
 
 powercfg /change monitor-timeout-ac 0
 powercfg /change monitor-timeout-dc 0
-Write-OK "Wygaszenie ekranu: nigdy"
+Write-OK $T.PowerMonitor
 
 powercfg /change standby-timeout-ac 0
 powercfg /change standby-timeout-dc 0
-Write-OK "Usypianie: nigdy"
+Write-OK $T.PowerStandby
 
 powercfg /hibernate off
-Write-OK "Hibernacja: wylaczona"
+Write-OK $T.PowerHib
 
-# ============================================================
-#  KROK 2: USUNIECIE STAREGO OFFICE (przed instalacja nowego)
-# ============================================================
-Write-Step "Szukanie starych instalacji Microsoft Office do usuniecia..."
-
-$officeUninstallKeys = @(
-    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-)
-
+# --- KROK 2: USUWANIE OFFICE ---
+Write-Step $T.Step2
+Write-Host "    $($T.OfficeSearch)"
+$officeUninstallKeys = @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall")
 $officeFound = @()
 foreach ($regPath in $officeUninstallKeys) {
     if (Test-Path $regPath) {
         Get-ChildItem $regPath | ForEach-Object {
             $displayName = ($_ | Get-ItemProperty -Name DisplayName -ErrorAction SilentlyContinue).DisplayName
             $uninstallStr = ($_ | Get-ItemProperty -Name UninstallString -ErrorAction SilentlyContinue).UninstallString
-            if ($displayName -match "Microsoft 365|Microsoft Office|Office 16|Office 15|Office 14" -and $uninstallStr) {
+            if ($displayName -match "Microsoft 365|Microsoft Office|Office 1[456]" -and $uninstallStr) {
                 $officeFound += [PSCustomObject]@{ Name = $displayName; Uninstall = $uninstallStr }
             }
         }
     }
 }
 
-# Metoda ODT (SaRA / OfficeSetup) - sprawdz czy Office jest zainstalowany przez C2R
-$c2rConfig = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
-$c2rFound = Test-Path $c2rConfig
-
-if ($officeFound.Count -eq 0 -and -not $c2rFound) {
-    Write-Skip "Nie znaleziono starych instalacji Office - pomijam"
+if ($officeFound.Count -eq 0) {
+    Write-Skip $T.OfficeSkip
 } else {
-    Write-Host "    Znaleziono instalacje Office do usuniecia:" -ForegroundColor Yellow
-    $officeFound | ForEach-Object { Write-Host "    - $($_.Name)" -ForegroundColor Yellow }
-
-    # Metoda 1: przez SaRA (Setup Assistant) jezeli OfficeSetup jest w instalki
-    # (instalator Office zostanie uruchomiony w kroku 3)
-    # Metoda 2: przez standardowy uninstall z rejestru
+    Write-Host "    $($T.OfficeFound)" -ForegroundColor Yellow
     foreach ($app in $officeFound) {
-        $uninstall = $app.Uninstall
-        Write-Host "    Odinstalowuje: $($app.Name)" -ForegroundColor Magenta
-        if ($uninstall -match "^MsiExec") {
-            $guid = ($uninstall -replace "MsiExec.exe\s*/[IX]", "").Trim()
+        Write-Host "    - $($app.Name)" -ForegroundColor Yellow
+        Write-Host "    $($T.OfficeUninstalling -f $app.Name)" -ForegroundColor Magenta
+        if ($app.Uninstall -match "^MsiExec") {
+            $guid = ($app.Uninstall -replace "MsiExec.exe\s*/[IX]", "").Trim()
             $proc = Start-Process "msiexec.exe" -ArgumentList "/qn /x $guid /norestart" -Wait -PassThru
         } else {
-            $proc = Start-Process "cmd.exe" -ArgumentList "/c $uninstall /quiet /norestart" -Wait -PassThru
+            $proc = Start-Process "cmd.exe" -ArgumentList "/c $($app.Uninstall) /quiet /norestart" -Wait -PassThru
         }
-        Write-OK "Odinstalowano: $($app.Name) (kod: $($proc.ExitCode))"
+        Write-OK ($T.OfficeDone -f $app.Name, $proc.ExitCode)
     }
-
-    # Metoda 3: Click-to-Run przez setup.exe jezeli dostepny
-    $c2rSetup = "C:\Program Files\Common Files\microsoft shared\ClickToRun\OfficeClickToRun.exe"
-    if (Test-Path $c2rSetup) {
-        Write-Host "    Usuwanie Office Click-to-Run..." -ForegroundColor Magenta
-        $proc = Start-Process $c2rSetup -ArgumentList "scenario=install scenariosubtype=ARP sourcetype=None productstoremove=O365ProPlusRetail.16_pl-pl_x-none" -Wait -PassThru
-        Write-OK "Office Click-to-Run usuniety (kod: $($proc.ExitCode))"
-    }
-
-    # Czyszczenie pozostalosci folderow
-    $officeFolders = @(
-        "C:\Program Files\Microsoft Office",
-        "C:\Program Files (x86)\Microsoft Office",
-        "C:\ProgramData\Microsoft\Office"
-    )
-    foreach ($folder in $officeFolders) {
-        if (Test-Path $folder) {
-            Remove-Item $folder -Recurse -Force -ErrorAction SilentlyContinue
-            Write-OK "Usunieto folder: $folder"
-        }
-    }
-
-    Write-OK "Stary Office usuniety - mozna zainstalowac nowy"
 }
 
-# ============================================================
-#  KROK 3: INSTALACJA APLIKACJI
-# ============================================================
-
+# --- KROK 3: INSTALACJA APLIKACJI ---
 function Install-App {
-    param(
-        [string]$Name,
-        [string]$File,
-        [string]$SilentArgs = "",
-        [bool]$Silent = $true
-    )
-
+    param([string]$Name, [string]$File, [string]$SilentArgs = "", [bool]$Silent = $true)
     $fullPath = Join-Path $InstallerPath $File
-
-    if (-not (Test-Path $fullPath)) {
-        Write-Skip "$Name - plik nie znaleziony: $File"
-        return
-    }
-
-    Write-Step "Instalacja: $Name"
-
+    if (-not (Test-Path $fullPath)) { Write-Skip ($T.AppNotFound -f $Name, $File); return }
+    Write-Step ($T.AppInstall -f $Name)
     if ($Silent -and $SilentArgs -ne "") {
         $proc = Start-Process -FilePath $fullPath -ArgumentList $SilentArgs -Wait -PassThru
-        if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
-            Write-OK "$Name zainstalowany (kod: $($proc.ExitCode))"
-        } else {
-            Write-Err "$Name - kod wyjscia: $($proc.ExitCode)"
-        }
+        Write-OK ($T.AppDone -f $Name, $proc.ExitCode)
     } else {
-        Write-Host "    -> Otwieranie instalatora $Name (instalacja reczna)..." -ForegroundColor Magenta
+        Write-Host "    $($T.AppManual -f $Name)" -ForegroundColor Magenta
         $proc = Start-Process -FilePath $fullPath -Wait -PassThru
-        Write-OK "$Name - instalator zamkniety"
+        Write-OK ($T.AppClosed -f $Name)
     }
 }
 
-# AnyDesk - silent
-Install-App -Name "AnyDesk" `
-            -File "AnyDesk.exe" `
-            -SilentArgs "--install `"C:\Program Files (x86)\AnyDesk`" --silent --create-shortcuts --create-desktop-icon --start-with-win" `
-            -Silent $true
+Install-App "AnyDesk" "AnyDesk.exe" "--install `"C:\Program Files (x86)\AnyDesk`" --silent --create-shortcuts --start-with-win" $true
 
-# ESET Endpoint Security - silent przez msiexec
-# Aby aktywowac licencje dodaj na koncu: ACTIVATION_DATA=key:AAAA-BBBB-CCCC-DDDD-EEEE
 $esetMsi = Join-Path $InstallerPath "ees_nt64.msi"
 if (Test-Path $esetMsi) {
-    Write-Step "Instalacja: ESET Endpoint Security"
-    $proc = Start-Process -FilePath "msiexec.exe" `
-        -ArgumentList "/qn /i `"$esetMsi`" ADDLOCAL=ALL REBOOT_WHEN_NEEDED=0" `
-        -Wait -PassThru
-    if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
-        Write-OK "ESET zainstalowany (kod: $($proc.ExitCode))"
-    } else {
-        Write-Err "ESET - kod wyjscia: $($proc.ExitCode)"
-    }
-} else {
-    Write-Skip "ESET - plik nie znaleziony: ees_nt64.msi"
+    Write-Step ($T.AppInstall -f "ESET")
+    $proc = Start-Process "msiexec.exe" -ArgumentList "/qn /i `"$esetMsi`" ADDLOCAL=ALL REBOOT_WHEN_NEEDED=0" -Wait -PassThru
+    Write-OK ($T.AppDone -f "ESET", $proc.ExitCode)
 }
 
-# Google Chrome Enterprise - silent przez msiexec
-$chromeMsi = Join-Path $InstallerPath "googlechromestandaloneenterprise64.msi"
-if (Test-Path $chromeMsi) {
-    Write-Step "Instalacja: Google Chrome Enterprise"
-    $proc = Start-Process -FilePath "msiexec.exe" `
-        -ArgumentList "/qn /i `"$chromeMsi`" /norestart" `
-        -Wait -PassThru
-    if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
-        Write-OK "Google Chrome zainstalowany (kod: $($proc.ExitCode))"
-    } else {
-        Write-Err "Google Chrome - kod wyjscia: $($proc.ExitCode)"
-    }
-} else {
-    Write-Skip "Google Chrome - plik nie znaleziony: googlechromestandaloneenterprise64.msi"
-}
+Install-App "Google Chrome" "googlechromestandaloneenterprise64.msi" "/qn /i" $true
+Install-App "Intel DSA" "Intel-Driver-and-Support-Assistant-Installer.exe" "-q" $true
+Install-App "Microsoft Office 32-bit PL" "OfficeSetup32bitPL.exe" "" $false
 
-# Intel Driver and Support Assistant - silent
-Install-App -Name "Intel Driver and Support Assistant" `
-            -File "Intel-Driver-and-Support-Assistant-Installer.exe" `
-            -SilentArgs "-q" `
-            -Silent $true
-
-# Microsoft Office 32-bit PL - reczna instalacja
-Install-App -Name "Microsoft Office 32-bit PL" `
-            -File "OfficeSetup32bitPL.exe" `
-            -Silent $false
-
-# ============================================================
-#  >> DODAJ KOLEJNE APLIKACJE TUTAJ <<
-#
-#  Silent .exe:
-#  Install-App -Name "Nazwa" -File "plik.exe" -SilentArgs "/S" -Silent $true
-#
-#  Silent .msi:
-#  $msi = Join-Path $InstallerPath "plik.msi"
-#  Start-Process "msiexec.exe" -ArgumentList "/qn /i `"$msi`" /norestart" -Wait
-#
-#  Reczna:
-#  Install-App -Name "Nazwa" -File "plik.exe" -Silent $false
-# ============================================================
-
-# ============================================================
-#  KROK 4: PRZYWROCENIE EXECUTION POLICY
-# ============================================================
-Write-Step "Przywracanie ExecutionPolicy do Restricted"
+# --- KROK 4: PORZĄDKI ---
+Write-Step $T.Step4
 Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope LocalMachine -Force
-Write-OK "ExecutionPolicy przywrocona do: Restricted"
+Write-OK $T.ExecRestored
 
-# ============================================================
-#  PODSUMOWANIE
-# ============================================================
-Write-Host ""
+Write-Host "`n============================================" -ForegroundColor Cyan
+Write-Host "  $($T.Summary)" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  GOTOWE! Przygotowanie komputera ukonczone." -ForegroundColor Cyan
-Write-Host "============================================" -ForegroundColor Cyan
-Write-Host ""
 if ($newName -ne "" -and $newName -ne $currentName) {
-    Write-Host "  UWAGA: Wymagany restart aby nazwa komputera" -ForegroundColor Yellow
-    Write-Host "         '$newName' weszla w zycie!" -ForegroundColor Yellow
-    Write-Host ""
+    Write-Host "`n  $($T.RebootReq -f $newName)" -ForegroundColor Yellow
 }
 pause
