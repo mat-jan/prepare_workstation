@@ -228,7 +228,7 @@ if (Test-Path $chromeMsi) {
 # Intel Driver and Support Assistant - silent
 Install-App -Name "Intel Driver and Support Assistant" `
             -File "Intel-Driver-and-Support-Assistant-Installer.exe" `
-            -SilentArgs "-q" `
+            -SilentArgs "-q -norestart" `
             -Silent $true
 
 # Microsoft Office 32-bit PL - reczna instalacja
